@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "IeG5V5cPD2g=",
+  "success": true,
+  "projectFilePath": "/Users/jonathan/Documents/GitHub/repos/ClearWeb/server/MyApp.Api.csproj",
+  "expectedPackageFiles": [
+    "/Users/jonathan/.nuget/packages/microsoft.aspnetcore.openapi/10.0.0/microsoft.aspnetcore.openapi.10.0.0.nupkg.sha512",
+    "/Users/jonathan/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
