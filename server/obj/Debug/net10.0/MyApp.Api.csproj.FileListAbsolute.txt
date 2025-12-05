@@ -31,3 +31,4 @@
 /Users/jonathan/Documents/GitHub/repos/ClearWeb/server/obj/Debug/net10.0/MyApp.Api.pdb
 /Users/jonathan/Documents/GitHub/repos/ClearWeb/server/obj/Debug/net10.0/MyApp.Api.genruntimeconfig.cache
 /Users/jonathan/Documents/GitHub/repos/ClearWeb/server/obj/Debug/net10.0/ref/MyApp.Api.dll
+/Users/jonathan/Documents/GitHub/repos/ClearWeb/server/obj/Debug/net10.0/MyApp.Api.sourcelink.json
