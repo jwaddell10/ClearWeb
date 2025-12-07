@@ -32,3 +32,4 @@
 /Users/jonathan/Documents/GitHub/repos/ClearWeb/server/obj/Debug/net10.0/MyApp.Api.genruntimeconfig.cache
 /Users/jonathan/Documents/GitHub/repos/ClearWeb/server/obj/Debug/net10.0/ref/MyApp.Api.dll
 /Users/jonathan/Documents/GitHub/repos/ClearWeb/server/obj/Debug/net10.0/MyApp.Api.sourcelink.json
+/Users/jonathan/Documents/GitHub/repos/ClearWeb/server/bin/Debug/net10.0/Npgsql.dll
