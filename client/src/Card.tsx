@@ -8,7 +8,7 @@ export default function Card() {
 		event.preventDefault();
 
 		try {
-			const response = await fetch(`http://localhost:5149/api/hello`, {
+			const response = await fetch(`http://localhost:5149/tasks`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -25,21 +25,7 @@ export default function Card() {
 		} catch (error) {
 			console.error("Error during form submission", error);
 		}
-		// const data = formData.get("toDoItem");
-		// console.log(data, "data");
 	};
-
-	// const fetchdata = async () => {
-	// 	try {
-	// 		const response = await fetch(`http://localhost:5149/api/hello`);
-	// 		const data = await response.json();
-	// 		console.log(data, "data received");
-	// 	} catch (error) {
-	// 		console.log(error, "error");
-	// 	}
-	// };
-
-	// fetchdata();
 
 	return (
 		<>

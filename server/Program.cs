@@ -36,7 +36,6 @@ app.MapGet("/tasks", async (HttpRequest request) =>
 
         for (int i = 0; i < reader.FieldCount; i++)
         {
-
             row[reader.GetName(i)] = reader.GetValue(i);
         }
         tasks.Add(row);
@@ -45,7 +44,7 @@ app.MapGet("/tasks", async (HttpRequest request) =>
     return Results.Json(tasks);
 });
 
-app.MapPost("/api/hello", async (HttpRequest request) =>
+app.MapPost("/tasks", async (HttpRequest request) =>
 {
     var data = await System.Text.Json.JsonSerializer
                 .DeserializeAsync<Dictionary<string, string>>(request.Body);
@@ -58,6 +57,16 @@ app.MapPost("/api/hello", async (HttpRequest request) =>
 
     return Results.Ok(new { Message = "Form submitted successfully", Name = name });
 });
+
+app.MapDelete("/api/tasks/{id}", async (int id) =>
+{
+    await using var cmd = dataSource.CreateCommand($"DELETE FROM data WHERE id = {id}");
+    await using var reader = await cmd.ExecuteReaderAsync();
+
+    return Results.Ok($"{id} deleted");
+});
+
+
 
 
 app.Run();

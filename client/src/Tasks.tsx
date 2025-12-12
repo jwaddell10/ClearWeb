@@ -17,11 +17,30 @@ export default function DisplayTasks() {
 
 		fetchData();
 	}, []);
+
+	const handleDelete = async (task) => {
+		console.log(JSON.stringify({task}), 'task')
+		const response = await fetch(`http://localhost:5149/api/tasks/${task.id}`, {
+			method: "DELETE",
+		});
+
+		const data = await response.json();
+		console.log(data, "data from backend");
+	};
+
 	return (
 		<>
 			{tasks?.map((task: Task) => (
 				<li>
 					{task.id}: {task.name}
+					<button
+						type="button"
+						onClick={() => {
+							handleDelete(task);
+						}}
+					>
+						Delete
+					</button>
 				</li>
 			))}
 		</>
