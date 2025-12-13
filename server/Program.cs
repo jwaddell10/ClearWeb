@@ -18,16 +18,10 @@ var app = builder.Build();
 
 app.UseCors("AllowReactApp");
 
-
-// app.MapGet("/api/hello", async (HttpRequest request, NpgsqlConnection db) =>
-// {
-
-// })
-
 app.MapGet("/tasks", async (HttpRequest request) =>
 {
     var tasks = new List<Dictionary<string, object>>();
-    await using var cmd = dataSource.CreateCommand("SELECT * FROM data");
+    await using var cmd = dataSource.CreateCommand("SELECT * FROM tasks");
     await using var reader = await cmd.ExecuteReaderAsync();
 
     while (await reader.ReadAsync())
@@ -50,8 +44,8 @@ app.MapPost("/tasks", async (HttpRequest request) =>
                 .DeserializeAsync<Dictionary<string, string>>(request.Body);
 
     var name = data?["name"] ?? "";
-
-    await using var cmd = dataSource.CreateCommand("INSERT INTO data (name) VALUES ($1)");
+    //get the highest position and add 10, otherwise make it 0.
+    await using var cmd = dataSource.CreateCommand("INSERT INTO tasks (name, position) SELECT $1, COALESCE(MAX(position), 0) + 10 FROM tasks");
     cmd.Parameters.AddWithValue(name);
     await cmd.ExecuteNonQueryAsync();
 
@@ -60,10 +54,15 @@ app.MapPost("/tasks", async (HttpRequest request) =>
 
 app.MapDelete("/api/tasks/{id}", async (int id) =>
 {
-    await using var cmd = dataSource.CreateCommand($"DELETE FROM data WHERE id = {id}");
+    await using var cmd = dataSource.CreateCommand($"DELETE FROM tasks WHERE id = {id}");
     await using var reader = await cmd.ExecuteReaderAsync();
 
     return Results.Ok($"{id} deleted");
+});
+
+app.MapPut("/api/tasks/update/{id}", async (int id) =>
+{
+    Console.WriteLine($"it runs");
 });
 
 

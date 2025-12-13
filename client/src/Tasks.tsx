@@ -19,13 +19,32 @@ export default function DisplayTasks() {
 	}, []);
 
 	const handleDelete = async (task) => {
-		console.log(JSON.stringify({task}), 'task')
-		const response = await fetch(`http://localhost:5149/api/tasks/${task.id}`, {
-			method: "DELETE",
-		});
+		console.log(JSON.stringify({ task }), "task");
+		const response = await fetch(
+			`http://localhost:5149/api/tasks/${task.id}`,
+			{
+				method: "DELETE",
+			}
+		);
 
 		const data = await response.json();
 		console.log(data, "data from backend");
+	};
+
+	const changePriority = async (event, task) => {
+		if (event.target.textContent === "+") {
+			const response = await fetch(
+				`http://localhost:5149/api/tasks/update/${task.id}`,
+				{
+					method: "PUT",
+					headers: { "Content-type": "appliciation/json" },
+					body: JSON.stringify({ task }),
+				}
+			);
+
+			const data = await response.json();
+			console.log(data, "data");
+		}
 	};
 
 	return (
@@ -40,6 +59,22 @@ export default function DisplayTasks() {
 						}}
 					>
 						Delete
+					</button>
+					<button
+						type="button"
+						onClick={(event) => {
+							changePriority(event, task);
+						}}
+					>
+						+
+					</button>
+					<button
+						type="button"
+						onClick={(event) => {
+							changePriority(event, task);
+						}}
+					>
+						-
 					</button>
 				</li>
 			))}
