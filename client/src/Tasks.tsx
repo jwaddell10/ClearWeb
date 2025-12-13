@@ -1,83 +1,163 @@
-import { useEffect, useState } from "react";
+import React from "react";
 
 type Task = {
-	id: number;
-	name: string;
+  id: number;
+  name: string;
+  position?: number;
 };
 
-export default function DisplayTasks() {
-	const [tasks, setTasks] = useState<Task[] | null>(null);
-	console.log(tasks, "tasks");
-	useEffect(() => {
-		const fetchData = async () => {
-			const response = await fetch(`http://localhost:5149/tasks`);
-			const data = await response.json();
-			setTasks(data);
-		};
+type DisplayTasksProps = {
+  tasks: Task[];
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+  onDelete?: (task: Task) => void;
+};
 
-		fetchData();
-	}, []);
+export default function DisplayTasks({ tasks, setTasks, onDelete }: DisplayTasksProps) {
+  const [draggedTask, setDraggedTask] = React.useState<Task | null>(null);
 
-	const handleDelete = async (task) => {
-		console.log(JSON.stringify({ task }), "task");
-		const response = await fetch(
-			`http://localhost:5149/api/tasks/${task.id}`,
-			{
-				method: "DELETE",
-			}
-		);
+  const handleDeleteLocal = async (task: Task) => {
+    if (onDelete) {
+      onDelete(task);
+      return;
+    }
+    // Fallback if no handler is provided
+    await fetch(`http://localhost:5149/api/tasks/${task.id}`, { method: "DELETE" });
+    setTasks((prev) =>
+      prev
+        .filter((t) => t.id !== task.id)
+        .map((t, i) => ({ ...t, position: i }))
+    );
+  };
 
-		const data = await response.json();
-		console.log(data, "data from backend");
-	};
+  const handleDragStart = (task: Task) => setDraggedTask(task);
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleDragEnd = () => setDraggedTask(null);
 
-	const changePriority = async (event, task) => {
-		if (event.target.textContent === "+") {
-			const response = await fetch(
-				`http://localhost:5149/api/tasks/update/${task.id}`,
-				{
-					method: "PUT",
-					headers: { "Content-type": "appliciation/json" },
-					body: JSON.stringify({ task }),
-				}
-			);
+  const handleDrop = async (e: React.DragEvent, targetTask: Task) => {
+    e.preventDefault();
+    if (!draggedTask || draggedTask.id === targetTask.id) return;
 
-			const data = await response.json();
-			console.log(data, "data");
-		}
-	};
+    const draggedIndex = tasks.findIndex((t) => t.id === draggedTask.id);
+    const targetIndex = tasks.findIndex((t) => t.id === targetTask.id);
 
-	return (
-		<>
-			{tasks?.map((task: Task) => (
-				<li>
-					{task.id}: {task.name}
-					<button
-						type="button"
-						onClick={() => {
-							handleDelete(task);
-						}}
-					>
-						Delete
-					</button>
-					<button
-						type="button"
-						onClick={(event) => {
-							changePriority(event, task);
-						}}
-					>
-						+
-					</button>
-					<button
-						type="button"
-						onClick={(event) => {
-							changePriority(event, task);
-						}}
-					>
-						-
-					</button>
-				</li>
-			))}
-		</>
-	);
+    const newTasks = [...tasks];
+    newTasks.splice(draggedIndex, 1);
+    newTasks.splice(targetIndex, 0, draggedTask);
+
+    const updatedTasks = newTasks.map((task, index) => ({
+      ...task,
+      position: index,
+    }));
+
+    setTasks(updatedTasks);
+    setDraggedTask(null);
+
+    await fetch(`http://localhost:5149/api/tasks/reorder`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tasks: updatedTasks.map((t) => ({ id: t.id, position: t.position })),
+      }),
+    });
+  };
+
+  // Gradient helpers
+  const interpolateColor = (
+    color1: [number, number, number],
+    color2: [number, number, number],
+    factor: number
+  ): string => {
+    const result = color1.map((c, i) =>
+      Math.round(c + factor * (color2[i] - c))
+    ) as [number, number, number];
+    return `rgb(${result[0]}, ${result[1]}, ${result[2]})`;
+  };
+
+  const getGradientColor = (index: number, total: number) => {
+    if (total === 1) return "rgb(255, 59, 48)"; // single task red
+
+    const red: [number, number, number] = [255, 59, 48];
+    const orange: [number, number, number] = [255, 149, 0];
+    const yellow: [number, number, number] = [255, 204, 0];
+
+    const ratio = index / (total - 1);
+
+    if (ratio <= 0.5) {
+      return interpolateColor(red, orange, ratio * 2);
+    } else {
+      return interpolateColor(orange, yellow, (ratio - 0.5) * 2);
+    }
+  };
+
+  // Use array index for gradient to guarantee correct coloring even if position is sparse (10, 20, ...)
+  const getColorForTask = (taskIndex: number, total: number) =>
+    getGradientColor(taskIndex, total);
+
+  const isDarkMode =
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  if (!tasks.length) {
+    return (
+      <div style={{ color: isDarkMode ? "#e0e0e0" : "#333" }}>
+        No tasks yet
+      </div>
+    );
+  }
+
+  return (
+    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      {tasks.map((task, index) => {
+        const bgColor =
+          draggedTask?.id === task.id
+            ? isDarkMode
+              ? "#1e3a5f"
+              : "#e3f2fd"
+            : getColorForTask(index, tasks.length);
+
+        return (
+          <li
+            key={task.id ?? `temp-${index}`}
+            draggable
+            onDragStart={() => handleDragStart(task)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, task)}
+            onDragEnd={handleDragEnd}
+            style={{
+              padding: "16px",
+              marginBottom: "8px",
+              backgroundColor: bgColor,
+              borderRadius: "4px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "move",
+              opacity: draggedTask?.id === task.id ? 0.5 : 1,
+              color: "#fff",
+              border: isDarkMode ? "1px solid #444" : "1px solid #ddd",
+            }}
+          >
+            <span style={{ flex: 1 }}>
+              {task.id}: {task.name ?? ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleDeleteLocal(task)}
+              style={{
+                padding: "4px 8px",
+                cursor: "pointer",
+                backgroundColor: isDarkMode ? "#444" : "#fff",
+                color: isDarkMode ? "#e0e0e0" : "#333",
+                border: isDarkMode ? "1px solid #666" : "1px solid #ccc",
+                borderRadius: "4px",
+              }}
+            >
+              Delete
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
