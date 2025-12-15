@@ -52,7 +52,7 @@ export default function DisplayTasks({ tasks, setTasks, onDelete }: DisplayTasks
     setTasks(updatedTasks);
     setDraggedTask(null);
 
-    await fetch(`http://localhost:5149/api/tasks/reorder`, {
+    await fetch(`${import.meta.env.VITE_API_URL}/api/tasks/reorder`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

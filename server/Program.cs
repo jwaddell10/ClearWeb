@@ -1,43 +1,58 @@
+using System.Text.Json;
+using Mscc.GenerativeAI;
 using Npgsql;
-
-var connectionString = "Host=localhost:5432;Username=jwaddell10;Password=Happy*90;Database=clearweb";
-await using var dataSource = NpgsqlDataSource.Create(connectionString);
+//AIzaSyDhe3WA-Pbkwxk2_-3v4sf9uBWje50_pX4//google ai API key
 
 var builder = WebApplication.CreateBuilder(args);
 
-// CORS
+// --- Read configuration from appsettings.json or environment variables ---
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? throw new InvalidOperationException("Connection string not found");
+
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins")
+                                        .Get<string[]>()
+                                        ?? Array.Empty<string>();
+
+var defaultConn = builder.Configuration["ConnectionStrings:DefaultConnection"];
+Console.WriteLine($"DefaultConnection: {defaultConn}");
+
+await using var dataSource = NpgsqlDataSource.Create(connectionString);
+
+// --- Configure CORS ---
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp",
-        policy => policy.WithOrigins("http://localhost:5173")
-                        .AllowAnyHeader()
-                        .AllowAnyMethod());
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
 });
 
 var app = builder.Build();
-
 app.UseCors("AllowReactApp");
 
-app.MapGet("/tasks", async (HttpRequest request) =>
+// --- GET all tasks ---
+app.MapGet("/tasks", async () =>
 {
     var tasks = new List<Dictionary<string, object>>();
+
     await using var cmd = dataSource.CreateCommand("SELECT * FROM tasks");
     await using var reader = await cmd.ExecuteReaderAsync();
 
     while (await reader.ReadAsync())
     {
         var row = new Dictionary<string, object>();
-
         for (int i = 0; i < reader.FieldCount; i++)
-        {
             row[reader.GetName(i)] = reader.GetValue(i);
-        }
+
         tasks.Add(row);
     }
 
     return Results.Json(tasks);
 });
 
+// --- POST a new task ---
 app.MapPost("/tasks", async (HttpRequest request) =>
 {
     var data = await System.Text.Json.JsonSerializer
@@ -46,9 +61,9 @@ app.MapPost("/tasks", async (HttpRequest request) =>
     var name = data?["name"] ?? "";
 
     await using var cmd = dataSource.CreateCommand(
-        "INSERT INTO tasks (name, position) " +
-        "SELECT $1, COALESCE(MAX(position), 0) + 10 FROM tasks " +
-        "RETURNING id, name, position"
+        @"INSERT INTO tasks (name, position)
+          SELECT $1, COALESCE(MAX(position), 0) + 10 FROM tasks
+          RETURNING id, name, position"
     );
     cmd.Parameters.AddWithValue(name);
 
@@ -65,34 +80,78 @@ app.MapPost("/tasks", async (HttpRequest request) =>
     return Results.Problem("Failed to insert task");
 });
 
-
-app.MapDelete("/api/tasks/{id}", async (int id) =>
+app.MapPost("/api/ai/chat", async (HttpRequest request) =>
 {
-    await using var cmd = dataSource.CreateCommand($"DELETE FROM tasks WHERE id = {id}");
-    await using var reader = await cmd.ExecuteReaderAsync();
+    // 1️⃣ Read user prompt
+    var body = await JsonSerializer.DeserializeAsync<JsonElement>(request.Body);
+    var userPrompt = body.GetProperty("prompt").GetString() ?? "";
 
-    return Results.Ok($"{id} deleted");
+    // 2️⃣ Fetch tasks from PostgreSQL
+    var tasks = new List<string>();
+    await using var cmd = dataSource.CreateCommand(
+        "SELECT name FROM tasks ORDER BY position"
+    );
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        tasks.Add(reader.GetString(0));
+    }
+
+    // 3️⃣ Build AI prompt
+    var prompt = $"""
+    You are a productivity assistant.
+
+    Current tasks:
+    - {string.Join("\n- ", tasks)}
+
+    User request:
+    {userPrompt}
+    """;
+
+    // 4️⃣ Call Gemini via Google AI Studio
+    var apiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
+    if (string.IsNullOrWhiteSpace(apiKey))
+        return Results.Problem("GOOGLE_API_KEY is not set");
+
+    var googleAI = new GoogleAI(apiKey);
+    var model = googleAI.GenerativeModel(Model.Gemini25Flash);
+
+    var response = await model.GenerateContent(prompt);
+
+    return Results.Ok(new
+    {
+        reply = response.Text
+    });
 });
 
+
+// --- DELETE a task ---
+app.MapDelete("/api/tasks/{id}", async (int id) =>
+{
+    await using var cmd = dataSource.CreateCommand("DELETE FROM tasks WHERE id = $1");
+    cmd.Parameters.AddWithValue(id);
+    var rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+    return rowsAffected > 0
+        ? Results.Ok($"{id} deleted")
+        : Results.NotFound($"Task {id} not found");
+});
+
+// --- UPDATE a single task ---
 app.MapPut("/api/tasks/update/{id}", async (int id, HttpRequest request) =>
 {
     var data = await System.Text.Json.JsonSerializer
                 .DeserializeAsync<Dictionary<string, System.Text.Json.JsonElement>>(request.Body);
 
     if (data == null || !data.ContainsKey("task"))
-    {
         return Results.BadRequest("Invalid request body");
-    }
 
     var task = data["task"];
-
-    // Extract name and position from the task object
     var name = task.GetProperty("name").GetString() ?? "";
-    int? position = task.TryGetProperty("position", out var posElement)
-        ? posElement.GetInt32()
+    int? position = task.TryGetProperty("position", out var posElem)
+        ? posElem.GetInt32()
         : null;
 
-    // Update the task
     await using var cmd = dataSource.CreateCommand(
         "UPDATE tasks SET name = $1, position = $2 WHERE id = $3"
     );
@@ -102,33 +161,22 @@ app.MapPut("/api/tasks/update/{id}", async (int id, HttpRequest request) =>
 
     var rowsAffected = await cmd.ExecuteNonQueryAsync();
 
-    if (rowsAffected == 0)
-    {
-        return Results.NotFound($"Task with id {id} not found");
-    }
-
-    return Results.Ok(new
-    {
-        Message = "Task updated successfully",
-        Id = id,
-        Name = name,
-        Position = position
-    });
+    return rowsAffected > 0
+        ? Results.Ok(new { Message = "Task updated successfully", Id = id, Name = name, Position = position })
+        : Results.NotFound($"Task with id {id} not found");
 });
 
+// --- REORDER tasks ---
 app.MapPut("/api/tasks/reorder", async (HttpRequest request) =>
 {
     var data = await System.Text.Json.JsonSerializer
                 .DeserializeAsync<Dictionary<string, System.Text.Json.JsonElement>>(request.Body);
 
     if (data == null || !data.ContainsKey("tasks"))
-    {
         return Results.BadRequest("Invalid request body");
-    }
 
     var tasksArray = data["tasks"].EnumerateArray();
 
-    // Use a transaction to update all positions atomically
     await using var connection = await dataSource.OpenConnectionAsync();
     await using var transaction = await connection.BeginTransactionAsync();
 

@@ -21,7 +21,7 @@ export default function Card() {
   const [name, setName] = useState("");
 
   const fetchTasks = useCallback(async () => {
-    const response = await fetch(`http://localhost:5149/tasks`);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/tasks`);
     const data = await response.json();
 
     // The GET /tasks returns a list of dictionaries; normalize each
@@ -43,7 +43,7 @@ export default function Card() {
     if (!name.trim()) return;
 
     try {
-      const response = await fetch(`http://localhost:5149/tasks`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -73,7 +73,7 @@ export default function Card() {
 
   const handleDelete = async (task: Task) => {
     try {
-      const res = await fetch(`http://localhost:5149/api/tasks/${task.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tasks/${task.id}`, {
         method: "DELETE",
       });
 
