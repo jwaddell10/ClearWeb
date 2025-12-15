@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Mscc.GenerativeAI;
 using Npgsql;
-//AIzaSyDhe3WA-Pbkwxk2_-3v4sf9uBWje50_pX4//google ai API key
 
 var builder = WebApplication.CreateBuilder(args);
 
