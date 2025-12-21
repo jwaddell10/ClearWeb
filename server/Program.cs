@@ -6,17 +6,16 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Prioritize Railway's DATABASE_URL, fallback to local DefaultConnection
+// --- 1. Connection String Logic (Railway & Local) ---
 var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-                          ?? builder.Configuration.GetConnectionString("DefaultConnection");
+                       ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
 if (string.IsNullOrEmpty(rawConnectionString))
 {
-    throw new InvalidOperationException("Connection string is missing!");
+    throw new InvalidOperationException("Connection string not found");
 }
 
-// 2. Convert URI format to Npgsql format if necessary
-// Railway uses postgres://... Npgsql prefers Host=...;
+// Convert URI (postgres://) to Npgsql format if necessary
 string finalConnectionString = rawConnectionString;
 if (rawConnectionString.StartsWith("postgres://") || rawConnectionString.StartsWith("postgresql://"))
 {
@@ -25,17 +24,23 @@ if (rawConnectionString.StartsWith("postgres://") || rawConnectionString.StartsW
     finalConnectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.Trim('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
 }
 
-// 3. Create the DataSource
 await using var dataSource = NpgsqlDataSource.Create(finalConnectionString);
 
-// --- Configure CORS ---
+// --- 2. CORS Configuration (Fixes CS0103) ---
+// We define 'allowedOrigins' BEFORE builder.Services.AddCors
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins")
+                                        .Get<string[]>()
+                                        ?? Array.Empty<string>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        // Fallback to allow any origin in dev if your array is empty
+        if (allowedOrigins.Length > 0)
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+        else
+            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
     });
 });
 
