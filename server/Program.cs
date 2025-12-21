@@ -28,23 +28,36 @@ await using var dataSource = NpgsqlDataSource.Create(finalConnectionString);
 
 // --- 2. CORS Configuration (Fixes CS0103) ---
 // We define 'allowedOrigins' BEFORE builder.Services.AddCors
+// --- 2. CORS Configuration ---
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins")
                                         .Get<string[]>()
                                         ?? Array.Empty<string>();
+
+// Debug logging: This will show up in your Railway "Logs" tab
+Console.WriteLine($"CORS Allowed Origins: {string.Join(", ", allowedOrigins)}");
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        // Fallback to allow any origin in dev if your array is empty
-        if (allowedOrigins.Length > 0)
-            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+        if (allowedOrigins.Any(o => !string.IsNullOrWhiteSpace(o)))
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .SetIsOriginAllowedToAllowWildcardSubdomains(); // Helps with Amplify subdomains
+        }
         else
+        {
+            // Strict fallback for local dev if variable is missing
             policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
     });
 });
 
 var app = builder.Build();
+
+// CRITICAL: Order matters!
 app.UseCors("AllowReactApp");
 
 app.MapGet("/", () => "API is running!");
