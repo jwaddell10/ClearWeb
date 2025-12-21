@@ -1,0 +1,21 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy csproj and restore as distinct layers to cache them
+COPY ["MyApp.Api.csproj", "./"]
+RUN dotnet restore "MyApp.Api.csproj"
+
+# Copy everything else and build
+COPY . .
+RUN dotnet publish "MyApp.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# Final stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=build /app/publish .
+
+# Railway environment setup
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "MyApp.Api.dll"]

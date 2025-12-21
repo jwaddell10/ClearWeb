@@ -2,20 +2,31 @@ using System.Text.Json;
 using Mscc.GenerativeAI;
 using Npgsql;
 
+using Npgsql;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Read configuration from appsettings.json or environment variables ---
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                       ?? throw new InvalidOperationException("Connection string not found");
+// 1. Prioritize Railway's DATABASE_URL, fallback to local DefaultConnection
+var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+                          ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins")
-                                        .Get<string[]>()
-                                        ?? Array.Empty<string>();
+if (string.IsNullOrEmpty(rawConnectionString))
+{
+    throw new InvalidOperationException("Connection string is missing!");
+}
 
-var defaultConn = builder.Configuration["ConnectionStrings:DefaultConnection"];
-Console.WriteLine($"DefaultConnection: {defaultConn}");
+// 2. Convert URI format to Npgsql format if necessary
+// Railway uses postgres://... Npgsql prefers Host=...;
+string finalConnectionString = rawConnectionString;
+if (rawConnectionString.StartsWith("postgres://") || rawConnectionString.StartsWith("postgresql://"))
+{
+    var uri = new Uri(rawConnectionString);
+    var userInfo = uri.UserInfo.Split(':');
+    finalConnectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.Trim('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+}
 
-await using var dataSource = NpgsqlDataSource.Create(connectionString);
+// 3. Create the DataSource
+await using var dataSource = NpgsqlDataSource.Create(finalConnectionString);
 
 // --- Configure CORS ---
 builder.Services.AddCors(options =>
