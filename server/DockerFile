@@ -1,21 +1,21 @@
+# Build Stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-
-# Copy csproj and restore as distinct layers to cache them
 COPY ["MyApp.Api.csproj", "./"]
-RUN dotnet restore "MyApp.Api.csproj"
-
-# Copy everything else and build
+RUN dotnet restore
 COPY . .
-RUN dotnet publish "MyApp.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+# We build a 'ReadyToRun' or standard release
+RUN dotnet publish "MyApp.Api.csproj" -c Release -o /app/publish
 
-# Final stage
+# Runtime Stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/publish .
 
-# Railway environment setup
+# Railway environment
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
+# CHANGE THIS LINE: Use the path directly if dotnet is 'not found'
+# This runs the DLL using the built-in host
 ENTRYPOINT ["dotnet", "MyApp.Api.dll"]

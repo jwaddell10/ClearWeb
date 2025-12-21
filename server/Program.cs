@@ -47,6 +47,8 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 app.UseCors("AllowReactApp");
 
+app.MapGet("/", () => "API is running!");
+
 // --- GET all tasks ---
 app.MapGet("/tasks", async () =>
 {
