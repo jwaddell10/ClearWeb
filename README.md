@@ -8,7 +8,7 @@ Try it at [https://clear-web-xi.vercel.app/](https://clear-web-xi.vercel.app/).
 
 ![ClearWeb task list](screenshot.jpg)
 
-There are no accounts. Everyone who opens the site shares one list. The assistant uses a free Gemini key, so chat can stop for the day if that quota runs out. Adding and reordering tasks still works.
+There are no accounts. At this time it's just one list since I use it for personal use. In the future can accommodate for multiple lists. The assistant uses a free Gemini key, so chat can stop for the day if that quota runs out. Adding and reordering tasks still works.
 
 ## What it does
 
